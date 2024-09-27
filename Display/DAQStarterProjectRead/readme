@@ -1,2 +1,4 @@
-Activate the virtual environment:
+Create a python virtual environment in this directory
+Activate virtual environment:
   source ./bin/activate
+ensure that pusher and serial packages are installed to the python virtual environment
