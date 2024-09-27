@@ -56,7 +56,8 @@ Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_flash_ex.c \
 Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_exti.c \
 Core/Src/system_stm32f0xx.c \
 Core/Src/sysmem.c \
-Core/Src/syscalls.c  
+Core/Src/syscalls.c \
+Core/Src/lsm6.c
 
 # ASM sources
 ASM_SOURCES =  \
