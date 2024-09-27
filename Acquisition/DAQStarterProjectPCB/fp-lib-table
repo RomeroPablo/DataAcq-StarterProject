@@ -1,0 +1,7 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "IMUSym")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/IMUSym")(options "")(descr ""))
+  (lib (name "MCUSym")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/MCUSym")(options "")(descr ""))
+  (lib (name "footprints")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/IMUSym/footprints.pretty")(options "")(descr ""))
+  (lib (name "USBSym")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/USBSym")(options "")(descr ""))
+)

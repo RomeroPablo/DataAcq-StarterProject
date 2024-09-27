@@ -2,4 +2,5 @@
   (version 7)
   (lib (name "LSM6DS3TR")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/IMUSym/2024-09-27_16-32-13.kicad_sym")(options "")(descr ""))
   (lib (name "STM32F042K6T6")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/MCUSym/STM32F042K6T6.kicad_sym")(options "")(descr ""))
+  (lib (name "FT230XS")(type "KiCad")(uri "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/USBSym/FT230XS.kicad_sym")(options "")(descr ""))
 )
