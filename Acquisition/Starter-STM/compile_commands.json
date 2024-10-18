@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "arguments": [
+      "/usr/bin/arm-none-eabi-gcc",
+      "-c",
+      "-mcpu=cortex-m0",
+      "-mthumb",
+      "-DUSE_HAL_DRIVER",
+      "-DSTM32F042x6",
+      "-ICore/Inc",
+      "-IDrivers/STM32F0xx_HAL_Driver/Inc",
+      "-IDrivers/STM32F0xx_HAL_Driver/Inc/Legacy",
+      "-IDrivers/CMSIS/Device/ST/STM32F0xx/Include",
+      "-IDrivers/CMSIS/Include",
+      "-Og",
+      "-Wall",
+      "-fdata-sections",
+      "-ffunction-sections",
+      "-g",
+      "-gdwarf-2",
+      "-Wa,-a,-ad,-alms=build/main.lst",
+      "-o",
+      "build/main.o",
+      "Core/Src/main.c"
+    ],
+    "directory": "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/Starter-STM",
+    "file": "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/Starter-STM/Core/Src/main.c",
+    "output": "/home/pablo/Documents/lhr/DataAcq-StarterProject/Acquisition/Starter-STM/build/main.o"
+  }
+]
