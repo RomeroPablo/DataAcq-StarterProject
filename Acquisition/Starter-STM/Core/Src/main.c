@@ -163,16 +163,31 @@ void lsm6_write(uint8_t address, uint8_t *txData) {
 void lsm6_init() {
   uint8_t data = 0;
 
-  // initialize gyroscope to sample rate and range
-  data = (0b1000<< 4) | (0b11<< 2 | 0b00);
+  // Important registers: 
+  // CTRL2_G (11h)
+  // ODR_G[7:4] Output Data Rate
+  // FS_G[3:2] Full-Scale Selection
+  // FS_125[1:1] Full scale == 125 dps
+  // NULL [0:0] set zero
+  data = (0b0011<< 4) | (0b11<< 2 | 0b00);
   lsm6_write((0x11), &data);
 
-  // initialize HP filter
-  // CTRL7_G register, 0x16
-  // bit 8 , set to 1 to enable high performance mode
-  // bit 7 , set to 1 to enable high-pass filter
-  // bit 5 , 6 high-pass filter cutoff frequency
-  data = (0b1 << 7) | (0b1 << 6) | (0b00 << 4);
+
+  // CTRL7_G (16h)
+  // [7:7]  set to 0 to enable high performance mode
+  // [6:6]  set to 1 to enable high-pass filter
+  // [5:4]  high-pass filter cutoff frequency
+  // [3:3]  digital hp filter reset  (0: disabled)
+  // [2:2]  rounding function enable (0: disabled)
+  // [1:0]  leave 0
+
+  // filter table:
+  // 00 - 0.0081 hz
+  // 01 - 0.0324 hz
+  // 10 - 2.07 hz
+  // 11 - 16.32 hz
+
+  data = (0b0 << 7) | (0b1 << 6) | (0b11 << 4) | 0b0000;
   lsm6_write((0x16),&data);
 
 }
@@ -180,7 +195,7 @@ void lsm6_init() {
 void lsm6_readGyro_RAW(LSM6DSL_AxesRaw_t *axes) {
   uint8_t addr[] = {0x22 | 0x80, 0, 0x23 | 0x80, 0, 0x24 | 0x80, 0,
                     0x25 | 0x80, 0, 0x26 | 0x80, 0, 0x27 | 0x80, 0};
-  
+
   // gyro is addr 0x22 - 0x27
   // we want to continously read addr 0x22 - 0x27
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
