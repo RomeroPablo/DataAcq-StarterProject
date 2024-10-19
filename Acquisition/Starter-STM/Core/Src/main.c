@@ -20,6 +20,8 @@
 #include "main.h"
 #include "gpio.h"
 #include "spi.h"
+#include "stm32f0xx_hal_gpio.h"
+#include "stm32f0xx_hal_spi.h"
 #include "usart.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -37,6 +39,37 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+// Accelerometer and gyroscope control registers
+#define LSM6DSL_CTRL1_XL 0x10
+#define LSM6DSL_CTRL2_G 0x11
+#define LSM6DSL_CTRL3_C 0x12
+#define LSM6DSL_CTRL4_C 0x13
+#define LSM6DSL_CTRL5_C 0x14
+#define LSM6DSL_CTRL6_C 0x15
+#define LSM6DSL_CTRL7_G 0x16
+#define LSM6DSL_CTRL8_XL 0x17
+#define LSM6DSL_CTRL9_XL 0x18
+#define LSM6DSL_CTRL10_C 0x19
+
+// Sensitivity conversions
+// Angular Velocity (DPS) = Raw data * Sensitivity
+// Ex:
+// full scale range of 125, each raw unit corresponds to 4.375 DPS
+// if we read 15, Angular Velocity = 15 * 4.375 = 65.625 DPS
+#define LSM6DSL_GYRO_SENSITIVITY_FS_125DPS 4.375f
+#define LSM6DSL_GYRO_SENSITIVITY_FS_250DPS 8.750f
+#define LSM6DSL_GYRO_SENSITIVITY_FS_500DPS 17.500f
+#define LSM6DSL_GYRO_SENSITIVITY_FS_1000DPS 35.000f
+#define LSM6DSL_GYRO_SENSITIVITY_FS_2000DPS 70.000f
+
+// Gyroscope output registers
+#define LSM6DSL_OUTX_L_G 0x22
+#define LSM6DSL_OUTX_H_G 0x23
+#define LSM6DSL_OUTY_L_G 0x24
+#define LSM6DSL_OUTY_H_G 0x25
+#define LSM6DSL_OUTZ_L_G 0x26
+#define LSM6DSL_OUTZ_H_G 0x27
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,20 +80,66 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+// Full Scale Range configuration paramaters
+// sets the degrees per second range we can acquire
+typedef enum {
+  LSM6DSL_250dps = 0,
+  LSM6DSL_125dps = 1,
+  LSM6DSL_500dps = 2,
+  LSM6DSL_1000dps = 4,
+  LSM6DSL_2000dps = 6
+} lsm6dsl_fs_g_t;
+
+// Output Data Rate configuration paramaters
+// frequency at which the gyroscope outputs data (Hz)
+typedef enum {
+  LSM6DSL_GY_ODR_OFF = 0,
+  LSM6DSL_GY_ODR_12Hz5 = 1,
+  LSM6DSL_GY_ODR_26Hz = 2,
+  LSM6DSL_GY_ODR_52Hz = 3,
+  LSM6DSL_GY_ODR_104Hz = 4,
+  LSM6DSL_GY_ODR_208Hz = 5,
+  LSM6DSL_GY_ODR_416Hz = 6,
+  LSM6DSL_GY_ODR_833Hz = 7,
+  LSM6DSL_GY_ODR_1k66Hz = 8,
+  LSM6DSL_GY_ODR_3k33Hz = 9,
+  LSM6DSL_GY_ODR_6k66Hz = 10
+} lsm6dsl_odr_g_t;
+
+// Packed Raw Data
+typedef union {
+  uint8_t bytes[6];
+
+  struct __attribute__((packed)) // ensure no padding
+  {
+    int16_t x;
+    int16_t y;
+    int16_t z;
+  };
+} LSM6DSL_AxesRaw_t;
+
+// 3 axis data (post processing)
+typedef struct {
+  int32_t x;
+  int32_t y;
+  int32_t z;
+} LSM6DSL_Axes_t;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void lsm6Read(uint8_t address, uint8_t *rxData);
-void lsm6Write(uint8_t address, uint8_t *txData);
+void lsm6_read(uint8_t address, uint8_t *rxData);
+void lsm6_write(uint8_t address, uint8_t *txData);
+void lsm6_init();
+void lsm6_readGyro(LSM6DSL_AxesRaw_t *axes);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void lsm6Read(uint8_t address, uint8_t *rxData) {
+void lsm6_read(uint8_t address, uint8_t *rxData) {
   uint8_t DataSize = 2;
   uint8_t TxData[] = {address | 0x80, 0};
   uint8_t RxData[] = {0, 0};
@@ -72,7 +151,41 @@ void lsm6Read(uint8_t address, uint8_t *rxData) {
   *rxData = RxData[1];
 }
 
-void lsm6Write(uint8_t address, uint8_t *txData) {
+void lsm6_write(uint8_t address, uint8_t *txData) {
+  uint8_t DataSize = 2;
+  uint8_t TxData[] = {address, *txData};
+
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, TxData, DataSize, 10000);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
+}
+
+void lsm6_init() {
+  uint8_t data = 0;
+
+  // initialize gyroscope to sample rate and range
+  data = (0b1000<< 4) | (0b11<< 2 | 0b00);
+  lsm6_write((0x11), &data);
+
+  // initialize HP filter
+  // CTRL7_G register, 0x16
+  // bit 8 , set to 1 to enable high performance mode
+  // bit 7 , set to 1 to enable high-pass filter
+  // bit 5 , 6 high-pass filter cutoff frequency
+  data = (0b1 << 7) | (0b1 << 6) | (0b00 << 4);
+  lsm6_write((0x16),&data);
+
+}
+
+void lsm6_readGyro_RAW(LSM6DSL_AxesRaw_t *axes) {
+  uint8_t addr[] = {0x22 | 0x80, 0, 0x23 | 0x80, 0, 0x24 | 0x80, 0,
+                    0x25 | 0x80, 0, 0x26 | 0x80, 0, 0x27 | 0x80, 0};
+  
+  // gyro is addr 0x22 - 0x27
+  // we want to continously read addr 0x22 - 0x27
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+  HAL_SPI_TransmitReceive(&hspi1, addr, (uint8_t*)axes, 12, 10000);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
 
 }
 
@@ -117,7 +230,7 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
 
   // SPI serial message
-  uint8_t SPImsg[50];
+  uint8_t UARTmsg[50];
 
   // spi package
   uint8_t addr;
@@ -125,19 +238,27 @@ int main(void) {
   uint8_t rxData;
 
   HAL_StatusTypeDef status;
+  lsm6_init();
+
+  LSM6DSL_AxesRaw_t gyro_raw;
 
   while (1) {
 
-    addr = 0x0F;
-    lsm6Read(addr, &rxData);
+    // read WHO_AM_I
+    // addr = 0x0F;
+    // lsm6_read(addr, &rxData);
 
-    snprintf((char *)SPImsg, sizeof(SPImsg), "WHO_AM_I: 0x%x\n\r", rxData);
+    lsm6_readGyro_RAW(&gyro_raw);
 
-    HAL_UART_Transmit(&huart1, (uint8_t *)SPImsg, strlen((char *)SPImsg), 200);
+    // snprintf((char *)SPImsg, sizeof(SPImsg), "WHO_AM_I: 0x%x\n\r", rxData);
+
+    snprintf((char *)UARTmsg, sizeof(UARTmsg), "%i %i %i\n\r", gyro_raw.x, gyro_raw.y, gyro_raw.z);
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)UARTmsg, strlen((char *)UARTmsg), 200);
 
     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_3);
 
-    HAL_Delay(500);
+    HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
